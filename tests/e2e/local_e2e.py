@@ -159,7 +159,17 @@ def main():
             "secure": bool(c.secure),
         } for c in client.cookies.jar])
         page = ctx.new_page()
-        page.goto(lure, timeout=60000, wait_until="domcontentloaded")
+        # first contact to a fresh campaign domain can race on-demand LE
+        # issuance — the initial TLS may stall/reset; retry the navigation
+        for attempt in range(4):
+            try:
+                page.goto(lure, timeout=60000, wait_until="domcontentloaded")
+                break
+            except Exception as e:
+                print(f"  goto attempt {attempt + 1} failed: {str(e)[:120]}", flush=True)
+                if attempt == 3:
+                    raise
+                time.sleep(8)
 
         # wait for WS connect + victim container spawn (first boot is slow);
         # on first contact of a fresh campaign domain the LE cert may still be
@@ -175,7 +185,10 @@ def main():
                 break
             if i == 10 and not reloaded:
                 reloaded = True
-                page.reload(wait_until="domcontentloaded")
+                try:
+                    page.reload(wait_until="domcontentloaded")
+                except Exception as e:
+                    print(f"  reload failed: {str(e)[:120]}", flush=True)
         report("victim connected", active, f"active={active}")
         if not active:
             browser.close()
