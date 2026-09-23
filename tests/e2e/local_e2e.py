@@ -22,6 +22,7 @@ Usage:
   python3 tests/e2e/local_e2e.py <admin_user> <admin_password> [--keep]
 """
 import json
+import os
 import subprocess
 import sys
 import time
@@ -29,7 +30,7 @@ import urllib3
 
 import httpx
 
-BASE = "https://127.0.0.1:8443"
+BASE = os.environ.get("PBITM_BASE", "https://127.0.0.1:8443")
 VERIFY = False  # self-signed local certificate
 urllib3.disable_warnings()
 
@@ -134,10 +135,14 @@ def main():
 
     # 4. playwright victim
     from playwright.sync_api import sync_playwright
+    chromium_path = "/usr/bin/chromium"
+    launch_kwargs = {"args": ["--no-sandbox", "--ignore-certificate-errors"]}
+    if not os.path.exists(chromium_path):
+        chromium_path = None  # use Playwright's bundled Chromium
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            executable_path="/usr/bin/chromium",
-            args=["--no-sandbox", "--ignore-certificate-errors"],
+            executable_path=chromium_path,
+            **launch_kwargs,
         )
         ctx = browser.new_context(ignore_https_errors=True)
         # copy the admin session cookie into the browser context so the
