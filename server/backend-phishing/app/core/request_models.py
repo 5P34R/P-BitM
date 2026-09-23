@@ -11,12 +11,18 @@ from core.favicon import (
     validate_favicon_data_uri,
     validate_favicon_url,
 )
+from core.uploads import (
+    UploadValidationError,
+    configured_upload_limit,
+    decode_png_image,
+)
 
 
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9_-]+$"
 DATA_TYPE_PATTERN = r"^[a-z][a-z0-9_-]*$"
 MAX_METADATA_BYTES = 256 * 1024
 MAX_OPERATION_PAYLOAD_BYTES = 1024 * 1024
+MAX_SNAPSHOT_IMAGE_CHARS = 16 * 1024 * 1024
 
 
 def ensure_json_size(value: Any, max_bytes: int, field_name: str) -> Any:
@@ -181,3 +187,23 @@ class ExecuteModuleRequest(StrictRequestModel):
         if len(value) > 64:
             raise ValueError("Too many module parameters")
         return ensure_json_size(value, MAX_METADATA_BYTES, "params")
+
+
+class SnapshotUploadRequest(StrictRequestModel):
+    request_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=IDENTIFIER_PATTERN,
+    )
+    image: str = Field(min_length=1, max_length=MAX_SNAPSHOT_IMAGE_CHARS)
+    url: str = Field(default="", max_length=2048)
+    title: str = Field(default="", max_length=256)
+
+    @field_validator("image")
+    @classmethod
+    def validate_image(cls, value: str) -> str:
+        try:
+            decode_png_image(value, configured_upload_limit())
+        except UploadValidationError as exc:
+            raise ValueError(str(exc)) from exc
+        return value

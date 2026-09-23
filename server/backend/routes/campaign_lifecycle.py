@@ -186,7 +186,8 @@ async def create_campaign(
         "site-info-hijacking",
         "disable-shortcuts",
         "form-interceptor",
-        "cookie-hijacking"
+        "cookie-hijacking",
+        "session-snapshot"
     ]
 
     plugins = db.query(Plugin).filter(Plugin.id.in_(plugin_ids)).all()

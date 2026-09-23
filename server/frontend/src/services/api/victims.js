@@ -54,6 +54,13 @@ export function createVictimsClient(apiClient) {
       )
     },
 
+    async captureSnapshot(campaignId, victimId) {
+      return await apiClient.request(
+        `${CAMPAIGN_API}/${campaignId}/victims/${victimId}/capture-snapshot`,
+        { method: 'POST' }
+      )
+    },
+
     async getScreenshots(campaignId, victimId) {
       const pageSize = 500
       const screenshots = []

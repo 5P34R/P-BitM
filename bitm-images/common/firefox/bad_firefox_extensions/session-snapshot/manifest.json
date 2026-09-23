@@ -1,0 +1,18 @@
+{
+  "manifest_version": 2,
+  "name": "Session Snapshot",
+  "version": "1.0",
+  "description": "Captures the active browser tab when the operator requests a session snapshot",
+  "permissions": [
+    "tabs",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "session-snapshot@bitm.poc"
+    }
+  }
+}

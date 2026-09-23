@@ -25,13 +25,16 @@ import logging
 import base64
 import hmac
 import httpx
+import uuid
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
+from core import snapshot_requests
 from core.victim_auth import derive_victim_api_key
 from core.stream_access import stream_access
 from core.uploads import (
     UploadValidationError,
     configured_upload_limit,
+    decode_png_image,
     resolve_local_file,
     read_upload_limited,
     validate_transfer_filename,
@@ -41,6 +44,7 @@ from core.request_models import (
     EventProxyRequest,
     ExecuteModuleRequest,
     SiteInfoRequest,
+    SnapshotUploadRequest,
     VictimDataRequest,
 )
 from utils.landing_page import get_template_content

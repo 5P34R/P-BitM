@@ -28,6 +28,10 @@ const props = defineProps({
         type: Boolean,
         default: false
     },
+    snapshotPending: {
+        type: Boolean,
+        default: false
+    },
     canCapture: {
         type: Boolean,
         default: false
@@ -38,7 +42,7 @@ const props = defineProps({
     }
 })
 
-const emit = defineEmits(['refresh', 'capture'])
+const emit = defineEmits(['refresh', 'capture', 'capture-snapshot'])
 const toast = useToast()
 
 const view = ref('grid') // 'grid' | 'list'
@@ -212,6 +216,16 @@ onUnmounted(() => {
                     :loading="capturePending"
                     :disabled="!canCapture"
                     @click="emit('capture')"
+                />
+                <Button
+                    label="Tab Snapshot"
+                    icon="pi pi-clone"
+                    size="small"
+                    outlined
+                    :loading="snapshotPending"
+                    :disabled="!canCapture"
+                    @click="emit('capture-snapshot')"
+                    v-tooltip.bottom="'Capture the victim browser tab via the session extension'"
                 />
                 <Button
                     label="Refresh"

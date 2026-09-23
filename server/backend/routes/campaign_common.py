@@ -177,6 +177,9 @@ def _serialize_screenshot(
         ),
         "collected_at": screenshot.collected_at,
         "resolution": metadata.get("resolution"),
+        "url": metadata.get("url"),
+        "capture_mode": metadata.get("capture_mode"),
+        "request_id": metadata.get("request_id"),
         "download_url": (
             f"/api/campaigns/{campaign_id}/victims/{victim_id}"
             f"/files/{screenshot.file_path}"

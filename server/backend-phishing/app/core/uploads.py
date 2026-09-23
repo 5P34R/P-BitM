@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 from pathlib import Path
 from pathlib import PurePath
@@ -8,6 +10,9 @@ from fastapi import UploadFile
 
 
 DEFAULT_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024
+
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+PNG_DATA_URL_PREFIX = "data:image/png;base64,"
 
 
 class UploadValidationError(ValueError):
@@ -67,3 +72,27 @@ def resolve_local_file(root: Path, filename: str) -> Path:
     if not candidate.is_file():
         raise UploadValidationError("Collected file was not found")
     return candidate
+
+
+def decode_png_image(value: str, max_bytes: int) -> bytes:
+    """Decode a base64 or PNG data-URL snapshot, enforcing type and size."""
+    if value.startswith("data:"):
+        header, separator, payload = value.partition(",")
+        if (
+            not separator
+            or header.lower() != PNG_DATA_URL_PREFIX[:-1]
+            or not payload
+        ):
+            raise UploadValidationError("Snapshot must be a base64 PNG data URL")
+        value = payload
+    try:
+        decoded = base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise UploadValidationError("Snapshot is not valid base64") from exc
+    if len(decoded) > max_bytes:
+        raise UploadValidationError(
+            f"Snapshot exceeds the maximum size of {max_bytes} bytes"
+        )
+    if not decoded.startswith(PNG_MAGIC):
+        raise UploadValidationError("Snapshot is not a PNG image")
+    return decoded
