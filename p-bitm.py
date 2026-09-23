@@ -28,6 +28,9 @@ from cli.commands import (
     cmd_victim_list, cmd_victim_status, cmd_victim_start,
     cmd_victim_stop, cmd_victim_logs,
 
+    # Module commands
+    cmd_modules_list, cmd_modules_data,
+
     # Admin commands
     cmd_admin_config, cmd_admin_reset_password, cmd_admin_users,
 
@@ -165,6 +168,41 @@ Examples:
         """
     )
     campaign_parser.add_argument('campaign_args', nargs='*', help=argparse.SUPPRESS)
+
+    # =========================================================================
+    # MODULES GROUP
+    # =========================================================================
+
+    modules_parser = subparsers.add_parser(
+        'modules',
+        help='List modules and export collected data',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Commands:
+  list                         List all modules
+  data                         Export collected module data for a campaign
+
+Examples:
+  python3 p-bitm.py modules list
+  python3 p-bitm.py modules data --campaign abc123
+  python3 p-bitm.py modules data --campaign abc123 --victim v123 --type screenshot --out ./export
+        """
+    )
+    modules_subparsers = modules_parser.add_subparsers(dest='modules_action', help='Modules commands')
+
+    # modules list
+    modules_list_parser = modules_subparsers.add_parser('list', help='List all modules')
+    modules_list_parser.add_argument('--format', choices=['table', 'json'], default='table')
+
+    # modules data
+    modules_data_parser = modules_subparsers.add_parser(
+        'data',
+        help='Export collected module data for a campaign'
+    )
+    modules_data_parser.add_argument('--campaign', required=True, help='Campaign ID')
+    modules_data_parser.add_argument('--victim', help='Filter by victim ID')
+    modules_data_parser.add_argument('--type', dest='data_type', help='Filter by data type (e.g. module_data, screenshot)')
+    modules_data_parser.add_argument('--out', help='Output directory (default: ./pbitm-export-<campaign>)')
 
     # =========================================================================
     # ADMIN GROUP
@@ -522,6 +560,36 @@ def execute_command(args):
 
         else:
             error(f"Unknown campaign action: {action}")
+            return False
+
+    # =========================================================================
+    # MODULE COMMANDS
+    # =========================================================================
+
+    elif args.command == 'modules':
+
+        if not args.modules_action:
+            # Auto-show help
+            sys.stderr.write('\n[ERROR] Missing modules command\n\n')
+            sys.stderr.write('💡 Available commands:\n')
+            sys.stderr.write('  list   List all modules\n')
+            sys.stderr.write('  data   Export collected module data\n\n')
+            sys.stderr.write('Use: python3 p-bitm.py modules -h for full help\n\n')
+            return False
+
+        if args.modules_action == 'list':
+            return cmd_modules_list(output_format=args.format)
+
+        elif args.modules_action == 'data':
+            return cmd_modules_data(
+                args.campaign,
+                victim_id=args.victim,
+                data_type=args.data_type,
+                out=args.out,
+            )
+
+        else:
+            error(f"Unknown modules action: {args.modules_action}")
             return False
 
     # =========================================================================

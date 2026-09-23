@@ -688,6 +688,155 @@ def dump_campaign_data(campaign_id: str, output_path: str = None):
         error(f"Failed to dump campaign data: {e}")
         return False
 
+def get_modules(db_path=None) -> List[Dict]:
+    """Get all modules from database"""
+    resolved_path = _resolve_db_path(db_path)
+
+    if not resolved_path.is_file():
+        warning(f"Database not found at {resolved_path}")
+        return []
+
+    conn = None
+    try:
+        conn = sqlite3.connect(str(resolved_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                id,
+                name,
+                category,
+                description,
+                created_at
+            FROM modules
+            ORDER BY name COLLATE NOCASE
+        """)
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    except Exception as e:
+        error(f"Failed to fetch modules: {e}")
+        return []
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def get_module_data(
+    campaign_id: str,
+    victim_id: str = None,
+    data_type: str = None,
+    db_path=None
+) -> List[Dict]:
+    """Get collected data collections for a campaign, optionally filtered"""
+    import json
+
+    resolved_path = _resolve_db_path(db_path)
+
+    if not resolved_path.is_file():
+        warning(f"Database not found at {resolved_path}")
+        return []
+
+    query = """
+        SELECT
+            dc.id,
+            dc.data_type,
+            dc.module_id,
+            m.name AS module_name,
+            dc.victim_id,
+            v.email AS victim_email,
+            v.first_name AS victim_first_name,
+            v.last_name AS victim_last_name,
+            dc.campaign_id,
+            dc.extra_metadata,
+            dc.collected_at,
+            dc.file_path,
+            dc.file_size_bytes
+        FROM data_collections dc
+        LEFT JOIN modules m ON m.id = dc.module_id
+        LEFT JOIN victims v ON v.id = dc.victim_id
+    """
+    conditions = []
+    params = []
+
+    if campaign_id:
+        conditions.append("dc.campaign_id = ?")
+        params.append(campaign_id)
+    if victim_id:
+        conditions.append("dc.victim_id = ?")
+        params.append(victim_id)
+    if data_type:
+        conditions.append("dc.data_type = ?")
+        params.append(data_type)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY dc.collected_at DESC"
+
+    conn = None
+    try:
+        conn = sqlite3.connect(str(resolved_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+
+        rows = []
+        for row in cursor.fetchall():
+            record = dict(row)
+            metadata = record.get('extra_metadata')
+            if isinstance(metadata, str):
+                try:
+                    record['extra_metadata'] = json.loads(metadata)
+                except ValueError:
+                    pass
+            rows.append(record)
+
+        return rows
+
+    except Exception as e:
+        error(f"Failed to fetch module data: {e}")
+        return []
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def show_modules_table():
+    """Display modules table"""
+    modules = get_modules()
+
+    if not modules:
+        info("No modules found")
+        console.print(f"\n[dim]Modules are loaded into the database by the backend.[/]\n")
+        return
+
+    table = Table(
+        title="Modules",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan"
+    )
+
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="yellow")
+    table.add_column("Category", style="magenta")
+    table.add_column("Created", style="dim")
+
+    for module in modules:
+        table.add_row(
+            module.get('id', '')[:8],
+            module.get('name', ''),
+            module.get('category', ''),
+            str(module.get('created_at', ''))
+        )
+
+    console.print()
+    console.print(table)
+    console.print(f"\n[dim]Total modules: {len(modules)}[/]")
+    console.print(f"[dim]Use [bold]python3 p-bitm.py modules data --campaign <id>[/] to export collected data[/]\n")
+
+
 def hash_password(password: str) -> str:
     """Hash password with bcrypt"""
     salt = bcrypt.gensalt()

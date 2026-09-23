@@ -1,6 +1,8 @@
 """CLI command handlers"""
 import sys
 import json
+import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -34,7 +36,8 @@ from cli.database import (
     get_campaigns, get_campaign_by_id, get_victims, get_victim_by_id,
     show_campaigns_table, show_campaign_details, show_victims_table,
     show_victim_details, dump_campaign_data, get_users, create_local_user,
-    set_local_user_role, set_local_user_active, delete_local_user
+    set_local_user_role, set_local_user_active, delete_local_user,
+    get_modules, get_module_data, show_modules_table
 )
 
 console = Console()
@@ -525,6 +528,153 @@ def cmd_victim_logs(campaign_id, victim_id, follow=False, tail=None):
         return False
 
     return get_victim_container_logs(campaign_id, victim.get('id'), follow=follow, tail=tail)
+
+
+# =============================================================================
+# MODULE COMMANDS
+# =============================================================================
+
+def cmd_modules_list(output_format='table'):
+    """List all modules"""
+    if output_format == 'json':
+        modules = get_modules()
+        console.print_json(json.dumps(modules, indent=2))
+    else:
+        show_modules_table()
+
+    return True
+
+
+def _campaign_storage_dir(campaign):
+    """Resolve the on-disk campaign storage directory (backend convention)"""
+    campaigns_dir = Path(config.get('paths.campaigns_dir', './storage/campaigns'))
+    if not campaigns_dir.is_absolute():
+        campaigns_dir = Path(__file__).resolve().parent.parent / campaigns_dir
+
+    clean_name = re.sub(r"[^A-Za-z0-9._-]+", "-", (campaign.get('name') or '').strip())
+    clean_name = clean_name.strip('.-')[:80] or 'campaign'
+    return campaigns_dir / f"{clean_name}-{campaign.get('id')}"
+
+
+def _resolve_artifact_source(campaign, row):
+    """Locate an artifact file on disk for a data collection row"""
+    file_path = row.get('file_path')
+    if not file_path:
+        return None
+
+    victim_root = _campaign_storage_dir(campaign) / (row.get('victim_id') or '')
+    candidates = [victim_root / file_path]
+
+    stored = Path(file_path)
+    if not stored.is_absolute():
+        candidates.append(Path(__file__).resolve().parent.parent / stored)
+
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+def cmd_modules_data(campaign_id, victim_id=None, data_type=None, out=None):
+    """Export collected module data and artifacts for a campaign"""
+    from datetime import datetime
+
+    campaign = get_campaign_by_id(campaign_id)
+    if not campaign:
+        error(f"Campaign not found: {campaign_id}")
+        return False
+
+    rows = get_module_data(
+        campaign.get('id'),
+        victim_id=victim_id,
+        data_type=data_type,
+    )
+
+    if not rows:
+        info("No collected data found for the given filters")
+        return True
+
+    out_dir = Path(out) if out else Path(f"pbitm-export-{campaign.get('id', '')[:8]}")
+    files_dir = out_dir / 'files'
+    try:
+        files_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        error(f"Failed to create export directory {out_dir}: {e}")
+        return False
+
+    copied = 0
+    missing = 0
+    export_rows = []
+    for row in rows:
+        record = {
+            'id': row.get('id'),
+            'module_name': row.get('module_name'),
+            'module_id': row.get('module_id'),
+            'victim_id': row.get('victim_id'),
+            'victim_email': row.get('victim_email'),
+            'data_type': row.get('data_type'),
+            'metadata': row.get('extra_metadata'),
+            'collected_at': str(row.get('collected_at', '')),
+            'file_path': row.get('file_path'),
+            'file_size_bytes': row.get('file_size_bytes'),
+            'exported_file': None,
+        }
+
+        source = _resolve_artifact_source(campaign, row)
+        if source is None:
+            if row.get('file_path'):
+                record['missing_file'] = True
+                missing += 1
+        else:
+            # Destination uses the basename only, so stored paths cannot
+            # traverse out of the export directory.
+            destination_name = Path(row.get('file_path')).name
+            if not destination_name or destination_name in ('.', '..'):
+                destination_name = f"{row.get('id', 'artifact')}.bin"
+            destination = files_dir / destination_name
+            if destination.exists():
+                destination = files_dir / f"{row.get('id', 'artifact')}_{destination_name}"
+            try:
+                shutil.copy2(source, destination)
+                record['exported_file'] = str(destination.relative_to(out_dir))
+                copied += 1
+            except OSError as e:
+                warning(f"Failed to copy {source}: {e}")
+                record['missing_file'] = True
+                missing += 1
+
+        export_rows.append(record)
+
+    export = {
+        'campaign': {
+            'id': campaign.get('id'),
+            'name': campaign.get('name'),
+        },
+        'filters': {
+            'victim_id': victim_id,
+            'data_type': data_type,
+        },
+        'exported_at': datetime.now().isoformat(),
+        'row_count': len(export_rows),
+        'files_copied': copied,
+        'files_missing': missing,
+        'rows': export_rows,
+    }
+
+    export_path = out_dir / 'module_data.json'
+    try:
+        with open(export_path, 'w', encoding='utf-8') as f:
+            json.dump(export, f, indent=2, ensure_ascii=False, default=str)
+    except OSError as e:
+        error(f"Failed to write {export_path}: {e}")
+        return False
+
+    success(f"Exported {len(export_rows)} data row(s) to: {export_path}")
+    info(f"Files copied: {copied}" + (f" (missing: {missing})" if missing else ""))
+    return True
 
 
 # =============================================================================
