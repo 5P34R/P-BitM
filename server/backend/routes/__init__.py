@@ -9,6 +9,7 @@ from .tracking import router as tracking_router
 from .plugins import router as plugins_router
 from .landing_pages import router as landing_pages_router
 from .modules import router as modules_router
+from .operator_stream import router as operator_stream_router
 
 __all__ = [
     "auth_router",
@@ -20,5 +21,6 @@ __all__ = [
     "tracking_router",
     "plugins_router",
     "landing_pages_router",
-    "modules_router"
+    "modules_router",
+    "operator_stream_router"
 ]

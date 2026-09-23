@@ -466,6 +466,7 @@ function getCategorySeverity(category) {
     'Browser Exploitation': 'danger',
     'Cross-Site Scripting': 'danger',
     'Clickjacking': 'warn',
+    'MFA Relay': 'warn',
     'Custom': 'secondary'
   }
   return severityMap[category] || 'secondary'

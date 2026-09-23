@@ -15,6 +15,7 @@ from routes import (
     email_templates_router,
     landing_pages_router,
     modules_router,
+    operator_stream_router,
     plugins_router,
     sending_profiles_router,
     target_lists_router,
@@ -144,6 +145,11 @@ app.include_router(
     tags=["landing-pages"],
 )
 app.include_router(modules_router, prefix="/api/modules", tags=["modules"])
+app.include_router(
+    operator_stream_router,
+    prefix="/api/campaigns",
+    tags=["operator-stream"],
+)
 
 
 @app.get("/health")
