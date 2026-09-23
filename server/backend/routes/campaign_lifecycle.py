@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from .campaign_common import (
     APIRouter,
+    CAMPAIGN_CPUS,
     CAMPAIGN_IMAGE,
+    CAMPAIGN_MEM_LIMIT,
     Campaign,
     CampaignCreateRequest,
     CampaignRuntimeStateError,
@@ -386,9 +388,9 @@ async def create_campaign(
                 host_storage_path: {"bind": "/storage", "mode": "rw"}
             },
             network=DOCKER_NETWORK,
-            mem_limit="4g",
-            memswap_limit="4g",
-            nano_cpus=2_000_000_000,
+            mem_limit=CAMPAIGN_MEM_LIMIT,
+            memswap_limit=CAMPAIGN_MEM_LIMIT,
+            nano_cpus=int(CAMPAIGN_CPUS * 1_000_000_000),
             pids_limit=512,
             cap_drop=["ALL"],
             security_opt=["no-new-privileges:true"],

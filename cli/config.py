@@ -101,6 +101,13 @@ class Config:
                         'enabled': True
                     }
                 },
+                'resources': {
+                    'campaign_mem_limit': '4g',
+                    'campaign_cpus': 2,
+                    'victim_mem_limit': '4g',
+                    'victim_cpus': 4,
+                    'egress_mem_limit': '256m'
+                },
                 'compose_images': [
                     'server-frontend',
                     'server-backend'

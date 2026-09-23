@@ -12,6 +12,7 @@ from utils.docker import get_docker_client
 
 
 EGRESS_IMAGE = os.getenv("EGRESS_IMAGE", "p-bitm-egress:latest")
+EGRESS_MEM_LIMIT = os.getenv("EGRESS_MEM_LIMIT", "256m")
 
 
 def create_campaign_egress_proxy(
@@ -41,8 +42,8 @@ def create_campaign_egress_proxy(
             "/var/spool/squid": "rw,noexec,nosuid,mode=1777,size=32m",
         },
         pids_limit=128,
-        mem_limit="256m",
-        memswap_limit="256m",
+        mem_limit=EGRESS_MEM_LIMIT,
+        memswap_limit=EGRESS_MEM_LIMIT,
         init=True,
         auto_remove=False,
     )

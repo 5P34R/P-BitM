@@ -112,6 +112,8 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 INTERNAL_API_KEY = os.environ["INTERNAL_API_KEY"]
 DOCKER_NETWORK = os.getenv("DOCKER_NETWORK", "server_bitm-network")
 CAMPAIGN_IMAGE = os.getenv("CAMPAIGN_IMAGE", "p-bitm:latest")
+CAMPAIGN_MEM_LIMIT = os.getenv("CAMPAIGN_MEM_LIMIT", "4g")
+CAMPAIGN_CPUS = float(os.getenv("CAMPAIGN_CPUS", "2.0"))
 STORAGE_PATH = os.getenv("STORAGE_PATH", "/storage")
 MODE = "default" if ENVIRONMENT == "development" else "kiosk"
 MAX_WEBCAM_PROXY_BODY_BYTES = 256 * 1024

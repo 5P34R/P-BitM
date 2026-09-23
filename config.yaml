@@ -74,6 +74,15 @@ docker:
       context: "server/egress-proxy"
       enabled: true
 
+  # Container resource limits. Adjust these to fit the host; Docker rejects
+  # CPU quotas above the host's core count.
+  resources:
+    campaign_mem_limit: "4g"
+    campaign_cpus: 2
+    victim_mem_limit: "4g"
+    victim_cpus: 4
+    egress_mem_limit: "256m"
+
   # Images built by Docker Compose
   compose_images:
     - "server-frontend"
@@ -90,14 +99,14 @@ ssl:
 
   # Certificate details. Replace these placeholders before running setup when
   # automatic local certificate generation is enabled.
-  country: "<COUNTRY_CODE>"  # ISO 3166-1 alpha-2 code, for example "US"
-  state: "<STATE_OR_PROVINCE>"
-  city: "<CITY>"
-  organization: "<ORGANIZATION>"
-  common_name: "<COMMON_NAME>"
+  country: "US"  # ISO 3166-1 alpha-2 code, for example "US"
+  state: "Local"
+  city: "Localhost"
+  organization: "P-BitM Local Test"
+  common_name: "192.168.10.70"
   validity_days: 365
   # Required in production for ACME certificate notifications.
-  acme_email: "<ACME_EMAIL>"
+  acme_email: "admin@pbitm.local"
   dns_challenge:
     # Replace this placeholder with the provider that manages your domain.
     provider: "<DNS_PROVIDER>"

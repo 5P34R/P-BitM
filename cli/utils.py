@@ -464,6 +464,13 @@ EGRESS_IMAGE=p-bitm-egress:latest
 PBITM_UID={identity.uid}
 PBITM_GID={identity.gid}
 
+# Container resource limits
+CAMPAIGN_MEM_LIMIT={config.get('docker.resources.campaign_mem_limit', '4g')}
+CAMPAIGN_CPUS={config.get('docker.resources.campaign_cpus', 2)}
+VICTIM_MEM_LIMIT={config.get('docker.resources.victim_mem_limit', '4g')}
+VICTIM_CPUS={config.get('docker.resources.victim_cpus', 4)}
+EGRESS_MEM_LIMIT={config.get('docker.resources.egress_mem_limit', '256m')}
+
 # Network
 IP=127.0.0.1
 

