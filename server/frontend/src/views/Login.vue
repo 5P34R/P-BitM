@@ -5,8 +5,8 @@
     </div>
     <div class="login-wrapper">
       <div class="login-header">
-        <img src="@/assets/images/logo.webp" alt="BITM Logo" class="login-logo" />
-        <p class="login-eyebrow">P-BitM Admin Dashboard</p>
+        <img src="@/assets/images/logo.svg" alt="PhantomDeck Logo" class="login-logo" />
+        <p class="login-eyebrow">PhantomDeck Admin Dashboard</p>
         <h1 class="login-brand">Sign in</h1>
         <p class="login-subtitle">Sign in to manage campaigns and live sessions.</p>
       </div>

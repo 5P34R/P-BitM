@@ -9,8 +9,8 @@
         @click="router.push({ name: 'campaigns' })"
       >
         <img
-          alt="BitM logo"
-          src="@/assets/images/logo.webp"
+          alt="PhantomDeck logo"
+          src="@/assets/images/logo.svg"
           class="logo"
         />
       </button>
