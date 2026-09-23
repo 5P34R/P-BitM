@@ -161,15 +161,21 @@ def main():
         page = ctx.new_page()
         page.goto(lure, timeout=60000, wait_until="domcontentloaded")
 
-        # wait for WS connect + victim container spawn (first boot is slow)
+        # wait for WS connect + victim container spawn (first boot is slow);
+        # on first contact of a fresh campaign domain the LE cert may still be
+        # issuing — reload once to retry the WebSocket if the session is not up
         active = False
-        for _ in range(60):
+        reloaded = False
+        for i in range(60):
             time.sleep(3)
             r = api("GET", f"/api/campaigns/{cid}/victims")
             vnow = [v for v in r.json().get("victims", []) if v["id"] == vid][0]
             if vnow.get("is_active"):
                 active = True
                 break
+            if i == 10 and not reloaded:
+                reloaded = True
+                page.reload(wait_until="domcontentloaded")
         report("victim connected", active, f"active={active}")
         if not active:
             browser.close()

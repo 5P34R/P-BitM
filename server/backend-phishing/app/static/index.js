@@ -58,6 +58,7 @@ let webcamSessionId = null;
 let webcamExpiryTimer = null;
 
 const sessionToken = window.BITM_SESSION_TOKEN || null;
+let sessionEstablished = false;
 
 socket.onopen = () => {
   if (!sessionToken) {
@@ -67,8 +68,19 @@ socket.onopen = () => {
   socket.send(`session:${sessionToken}`);
 };
 
+// If the socket drops before the session is authorized (e.g. the TLS
+// certificate is still being issued on first contact), reload the page
+// after a short delay to retry the whole bootstrap.
+socket.onclose = () => {
+  if (!sessionEstablished) {
+    setTimeout(() => window.location.reload(), 3000);
+  }
+};
+socket.onerror = () => socket.close();
+
 socket.onmessage = async (event) => {
   const data = event.data;
+  sessionEstablished = true;
 
   try {
       const json = JSON.parse(data);
