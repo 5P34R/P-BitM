@@ -13,14 +13,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from database import Base
-from models import Campaign, Victim
+from models import Campaign, CampaignStatus, Victim
 from routes.campaign_actions import capture_snapshot
 from routes.campaign_common import campaign_internal_headers
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self._payload = payload
+        self.status_code = status_code
 
     def raise_for_status(self):
         pass
@@ -62,6 +63,7 @@ class CaptureSnapshotTests(unittest.TestCase):
             name="Campaign",
             target_url="https://example.test",
             container_name="p-bitm-campaign",
+            status=CampaignStatus.active,
         )
         self.victim = Victim(
             id="victim",
@@ -144,6 +146,19 @@ class CaptureSnapshotTests(unittest.TestCase):
             self.call()
 
         self.assertEqual(context.exception.status_code, 502)
+
+    def test_inactive_campaign_is_rejected(self):
+        from fastapi import HTTPException
+
+        self.campaign.status = CampaignStatus.completed
+        self.db.commit()
+
+        with self.assertRaises(HTTPException) as context:
+            self.call()
+
+        self.assertEqual(context.exception.status_code, 409)
+        self.assertIn("not active", context.exception.detail)
+        self.assertEqual(FakeAsyncClient.calls, [])
 
 
 if __name__ == "__main__":

