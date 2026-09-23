@@ -31,6 +31,9 @@ import urllib3
 import httpx
 
 BASE = os.environ.get("PBITM_BASE", "https://127.0.0.1:8443")
+# Optional production domain: when set, campaigns get a per-run subdomain
+# (e2e-<ts>.<domain>) as their public_domain and lures use it.
+DOMAIN = os.environ.get("PBITM_DOMAIN")
 VERIFY = False  # self-signed local certificate
 urllib3.disable_warnings()
 
@@ -88,7 +91,7 @@ def main():
             json={"email": "victim@example.com", "first_name": "Test", "last_name": "Victim"})
     report("add target", r.status_code in (200, 201), f"{r.status_code}")
 
-    r = api("POST", "/api/campaigns", json={
+    campaign_payload = {
         "name": f"e2e-campaign-{ts}",
         "url": "https://example.com/login",
         "campaign_type": "standalone",
@@ -96,7 +99,10 @@ def main():
         "target_list_id": list_id,
         "launch_type": "immediate",
         "module_ids": list(mod_ids.values()),
-    })
+    }
+    if DOMAIN:
+        campaign_payload["public_domain"] = f"e2e-{ts}.{DOMAIN}"
+    r = api("POST", "/api/campaigns", json=campaign_payload)
     if r.status_code not in (200, 201):
         report("create campaign", False, f"{r.status_code} {r.text[:300]}")
         return 1
