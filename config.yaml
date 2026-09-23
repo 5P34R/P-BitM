@@ -107,6 +107,9 @@ ssl:
   validity_days: 365
   # Required in production for ACME certificate notifications.
   acme_email: "admin@pbitm.local"
+  # ACME challenge type: "dns" (DNS-01, needs provider credentials, supports
+  # wildcards) or "tlsalpn" (TLS-ALPN-01, no credentials, exact hostnames only).
+  acme_challenge: "dns"
   dns_challenge:
     # Replace this placeholder with the provider that manages your domain.
     provider: "<DNS_PROVIDER>"

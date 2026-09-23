@@ -68,6 +68,7 @@ class Config:
                 'organization': '<ORGANIZATION>',
                 'common_name': '<COMMON_NAME>',
                 'acme_email': '<ACME_EMAIL>',
+                'acme_challenge': 'dns',
                 'dns_challenge': {
                     'provider': '<DNS_PROVIDER>',
                     'credentials': ['<PROVIDER_REQUIRED_ENV_VAR>'],

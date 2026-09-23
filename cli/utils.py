@@ -492,11 +492,15 @@ IP=127.0.0.1
 
 
 def ensure_dns_challenge(force: bool = False) -> bool:
-    """Provision provider-specific DNS credentials and Traefik runtime files."""
+    """Provision ACME challenge credentials and Traefik runtime files."""
     import re
     import yaml
 
     project_root = Path(__file__).parent.parent.resolve()
+    challenge = str(config.get('ssl.acme_challenge', 'dns')).strip().lower()
+    if challenge not in {'dns', 'tlsalpn'}:
+        error("ssl.acme_challenge must be 'dns' or 'tlsalpn' in config.yaml")
+        return False
     dns_config = config.get('ssl.dns_challenge', {})
     acme_email = config.get('ssl.acme_email', '').strip()
     provider = str(dns_config.get('provider', '')).strip()
@@ -507,12 +511,13 @@ def ensure_dns_challenge(force: bool = False) -> bool:
         error("ssl.acme_email is missing or invalid in config.yaml")
         return False
 
-    if not provider or not re.fullmatch(r'[A-Za-z0-9_-]+', provider):
-        error("ssl.dns_challenge.provider is missing or invalid in config.yaml")
-        return False
-    if not isinstance(credentials, list) or not isinstance(public_environment, dict):
-        error("DNS credentials must be a list and environment must be a mapping")
-        return False
+    if challenge == 'dns':
+        if not provider or not re.fullmatch(r'[A-Za-z0-9_-]+', provider):
+            error("ssl.dns_challenge.provider is missing or invalid in config.yaml")
+            return False
+        if not isinstance(credentials, list) or not isinstance(public_environment, dict):
+            error("DNS credentials must be a list and environment must be a mapping")
+            return False
 
     def project_path(config_key, default):
         path = Path(config.get(config_key, default))
@@ -529,77 +534,79 @@ def ensure_dns_challenge(force: bool = False) -> bool:
         './server/traefik/traefik.prod.runtime.yml'
     )
 
-    secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    secrets_dir.chmod(0o700)
-    adopt_generated_path(secrets_dir)
-    legacy_env = read_env_file(project_root / 'server' / '.env')
-    legacy_duckdns_path = project_root / 'server' / '.secrets' / 'duckdns_token'
+    if challenge == 'dns':
+        secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        secrets_dir.chmod(0o700)
+        adopt_generated_path(secrets_dir)
+        legacy_env = read_env_file(project_root / 'server' / '.env')
+        legacy_duckdns_path = project_root / 'server' / '.secrets' / 'duckdns_token'
 
-    for variable in credentials:
-        variable = str(variable).strip()
-        if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', variable):
-            error(f"Invalid DNS credential variable: {variable}")
-            return False
-
-        secret_path = secrets_dir / variable
-        if not force and secret_path.exists() and secret_path.read_text().strip():
-            secret_path.chmod(0o600)
-            adopt_generated_path(secret_path)
-            continue
-
-        # Migrate the original DuckDNS-specific file without exposing its value.
-        if (
-            not force
-            and variable == 'DUCKDNS_TOKEN'
-            and legacy_duckdns_path.exists()
-            and legacy_duckdns_path.read_text().strip()
-        ):
-            legacy_duckdns_path.replace(secret_path)
-            secret_path.chmod(0o600)
-            adopt_generated_path(secret_path)
-            info(f"Migrated {variable} to {secret_path.relative_to(project_root)}")
-            continue
-
-        value = os.environ.get(variable, '').strip()
-        if not value and not force:
-            value = legacy_env.get(variable, '').strip()
-
-        if not value:
-            if not sys.stdin.isatty():
-                error(
-                    f"{variable} is missing. Set it for this setup run or "
-                    "run setup interactively."
-                )
+        for variable in credentials:
+            variable = str(variable).strip()
+            if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', variable):
+                error(f"Invalid DNS credential variable: {variable}")
                 return False
 
-            from rich.prompt import Prompt
-            value = Prompt.ask(
-                f"{provider} credential {variable} (stored locally, input hidden)",
-                password=True
-            ).strip()
+            secret_path = secrets_dir / variable
+            if not force and secret_path.exists() and secret_path.read_text().strip():
+                secret_path.chmod(0o600)
+                adopt_generated_path(secret_path)
+                continue
 
-        if not value:
-            error(f"{variable} cannot be empty")
-            return False
+            # Migrate the original DuckDNS-specific file without exposing its value.
+            if (
+                not force
+                and variable == 'DUCKDNS_TOKEN'
+                and legacy_duckdns_path.exists()
+                and legacy_duckdns_path.read_text().strip()
+            ):
+                legacy_duckdns_path.replace(secret_path)
+                secret_path.chmod(0o600)
+                adopt_generated_path(secret_path)
+                info(f"Migrated {variable} to {secret_path.relative_to(project_root)}")
+                continue
 
-        secret_path.write_text(f"{value}\n")
-        secret_path.chmod(0o600)
-        adopt_generated_path(secret_path)
+            value = os.environ.get(variable, '').strip()
+            if not value and not force:
+                value = legacy_env.get(variable, '').strip()
+
+            if not value:
+                if not sys.stdin.isatty():
+                    error(
+                        f"{variable} is missing. Set it for this setup run or "
+                        "run setup interactively."
+                    )
+                    return False
+
+                from rich.prompt import Prompt
+                value = Prompt.ask(
+                    f"{provider} credential {variable} (stored locally, input hidden)",
+                    password=True
+                ).strip()
+
+            if not value:
+                error(f"{variable} cannot be empty")
+                return False
+
+            secret_path.write_text(f"{value}\n")
+            secret_path.chmod(0o600)
+            adopt_generated_path(secret_path)
 
     env_lines = [
         "# Auto-generated by P-BitM CLI; contains paths, not secret values."
     ]
-    for variable in credentials:
-        variable = str(variable).strip()
-        env_lines.append(f"{variable}_FILE=/run/secrets/dns/{variable}")
+    if challenge == 'dns':
+        for variable in credentials:
+            variable = str(variable).strip()
+            env_lines.append(f"{variable}_FILE=/run/secrets/dns/{variable}")
 
-    for variable, value in public_environment.items():
-        variable = str(variable).strip()
-        value = str(value)
-        if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', variable) or '\n' in value:
-            error(f"Invalid DNS environment entry: {variable}")
-            return False
-        env_lines.append(f"{variable}={value}")
+        for variable, value in public_environment.items():
+            variable = str(variable).strip()
+            value = str(value)
+            if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', variable) or '\n' in value:
+                error(f"Invalid DNS environment entry: {variable}")
+                return False
+            env_lines.append(f"{variable}={value}")
 
     dns_env_path.parent.mkdir(parents=True, exist_ok=True)
     dns_env_path.write_text('\n'.join(env_lines) + '\n')
@@ -614,7 +621,11 @@ def ensure_dns_challenge(force: bool = False) -> bool:
     try:
         acme = runtime_config['certificatesResolvers']['letsencrypt']['acme']
         acme['email'] = config.get('ssl.acme_email', '<ACME_EMAIL>')
-        acme['dnsChallenge']['provider'] = provider
+        if challenge == 'dns':
+            acme['dnsChallenge']['provider'] = provider
+        else:
+            acme.pop('dnsChallenge', None)
+            acme['tlsChallenge'] = True
     except (KeyError, TypeError):
         error(f"Invalid Traefik production template: {template_path}")
         return False
@@ -624,10 +635,16 @@ def ensure_dns_challenge(force: bool = False) -> bool:
     runtime_path.chmod(0o644)
     adopt_generated_path(runtime_path)
 
-    success(
-        f"DNS challenge configured for {provider} "
-        f"with {len(credentials)} credential file(s)"
-    )
+    if challenge == 'dns':
+        success(
+            f"DNS challenge configured for {provider} "
+            f"with {len(credentials)} credential file(s)"
+        )
+    else:
+        success(
+            "TLS-ALPN-01 challenge configured "
+            "(no DNS provider credentials required)"
+        )
     return True
 
 def update_env_file(ip: str):
