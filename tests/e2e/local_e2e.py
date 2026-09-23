@@ -136,7 +136,8 @@ def main():
     # 4. playwright victim
     from playwright.sync_api import sync_playwright
     chromium_path = "/usr/bin/chromium"
-    launch_kwargs = {"args": ["--no-sandbox", "--ignore-certificate-errors"]}
+    launch_kwargs = {"args": ["--no-sandbox", "--ignore-certificate-errors",
+                              "--disable-quic"]}
     if not os.path.exists(chromium_path):
         chromium_path = None  # use Playwright's bundled Chromium
     with sync_playwright() as p:
