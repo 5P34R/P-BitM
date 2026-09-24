@@ -185,6 +185,21 @@
                 placeholder="Brief description..."
               />
             </div>
+
+            <div v-if="dialogMode === 'create'" class="field">
+              <label for="pageTemplate">Template</label>
+              <Select
+                id="pageTemplate"
+                v-model="landingPageForm.template"
+                :options="templateOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Blank page"
+              />
+              <small v-if="landingPageForm.template" class="field-hint">
+                The HTML editor is disabled — the template provides the content.
+              </small>
+            </div>
           </div>
 
           <Divider />
@@ -284,16 +299,24 @@
         </div>
 
         <!-- Right Side: Code Editor -->
-        <div class="editor-container">
+        <div v-if="dialogMode === 'edit' || !landingPageForm.template" class="editor-container">
           <CodeCard
             v-model="landingPageForm.content"
             title="HTML Content"
             icon="pi pi-globe"
             language="html"
             height="100%"
-            :required="true"
-            :error="submitted && !landingPageForm.content ? 'HTML content is required' : ''"
+            :required="!landingPageForm.template"
+            :error="submitted && !landingPageForm.template && !landingPageForm.content ? 'HTML content is required' : ''"
           />
+        </div>
+        <div v-else class="editor-container template-selected">
+          <i class="pi pi-file-edit"></i>
+          <p>
+            Content is provided by the
+            <strong>{{ selectedTemplateName }}</strong>
+            template. Create the page to edit its HTML.
+          </p>
         </div>
       </div>
 
@@ -412,7 +435,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { FilterMatchMode } from '@primevue/core/api'
 import { backendService } from '@/services/backend'
@@ -422,6 +445,7 @@ import PageHeader from '@/components/default/PageHeader.vue'
 import DelayedContent from '@/components/default/DelayedContent.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Select from 'primevue/select'
 import { useDelayedIndicator } from '@/composables/useDelayedIndicator'
 import DeleteResourceDialog from '@/components/default/DeleteResourceDialog.vue'
 import { DEFAULT_LANDING_PAGE_TEMPLATE } from '@/constants/landingPageDefaults'
@@ -451,11 +475,26 @@ const cloneName = ref('')
 
 const importInput = ref(null)
 
+const landingPageTemplates = ref([])
+
 const landingPageForm = ref({
   id: null,
   name: '',
   description: '',
-  content: ''
+  content: '',
+  template: ''
+})
+
+const templateOptions = computed(() => [
+  { label: 'Blank page', value: '' },
+  ...landingPageTemplates.value.map((t) => ({ label: t.name, value: t.id }))
+])
+
+const selectedTemplateName = computed(() => {
+  const template = landingPageTemplates.value.find(
+    (t) => t.id === landingPageForm.value.template
+  )
+  return template ? template.name : ''
 })
 
 const filters = ref({
@@ -491,10 +530,20 @@ const fetchLandingPages = async () => {
   }
 }
 
+const fetchLandingPageTemplates = async () => {
+  try {
+    const data = await backendService.getLandingPageTemplates()
+    landingPageTemplates.value = data.templates || []
+  } catch (error) {
+    console.error('Failed to fetch landing page templates:', error)
+  }
+}
+
 const openCreateDialog = () => {
   dialogMode.value = 'create'
   resetForm()
   landingPageForm.value.content = DEFAULT_LANDING_PAGE_TEMPLATE
+  fetchLandingPageTemplates()
   showEditDialog.value = true
 }
 
@@ -507,7 +556,8 @@ const openEditDialog = (page) => {
 const saveLandingPage = async () => {
   submitted.value = true
 
-  if (!landingPageForm.value.name || !landingPageForm.value.content) {
+  const requiresContent = dialogMode.value === 'edit' || !landingPageForm.value.template
+  if (!landingPageForm.value.name || (requiresContent && !landingPageForm.value.content)) {
     toast.add({
       severity: 'warn',
       summary: 'Warning',
@@ -806,7 +856,8 @@ const resetForm = () => {
     id: null,
     name: '',
     description: '',
-    content: ''
+    content: '',
+    template: ''
   }
   submitted.value = false
 }

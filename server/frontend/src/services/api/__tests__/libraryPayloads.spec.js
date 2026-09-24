@@ -76,6 +76,58 @@ describe('library mutation payloads', () => {
     })
   })
 
+  it('sends the template id on create without content', async () => {
+    const { apiClient, request } = mockApi()
+    const client = createLandingPagesClient(apiClient)
+
+    await client.createLandingPage({
+      name: 'BitB landing',
+      description: 'Fake browser window',
+      content: '',
+      template: 'bitb_chrome'
+    })
+
+    expect(request).toHaveBeenCalledWith('api/landing-pages', {
+      method: 'POST',
+      body: expect.any(String)
+    })
+    expect(requestBody(request)).toEqual({
+      name: 'BitB landing',
+      description: 'Fake browser window',
+      content: '',
+      template: 'bitb_chrome'
+    })
+  })
+
+  it('omits the template field for blank-page creates', async () => {
+    const { apiClient, request } = mockApi()
+    const client = createLandingPagesClient(apiClient)
+
+    await client.createLandingPage({
+      name: 'Blank',
+      description: '',
+      content: '<main></main>',
+      template: ''
+    })
+
+    expect(requestBody(request)).toEqual({
+      name: 'Blank',
+      description: '',
+      content: '<main></main>'
+    })
+  })
+
+  it('fetches the landing page template list', async () => {
+    const { apiClient, request } = mockApi()
+    const client = createLandingPagesClient(apiClient)
+
+    await client.getLandingPageTemplates()
+
+    expect(request).toHaveBeenCalledWith('api/landing-pages/templates', {
+      method: 'GET'
+    })
+  })
+
   it('strips module metadata and unsupported nested input fields', async () => {
     const { apiClient, request } = mockApi()
     const client = createModulesClient(apiClient)

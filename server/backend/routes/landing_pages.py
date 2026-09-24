@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from pathlib import Path
+import re
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -20,6 +22,32 @@ from utils.uploads import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+TEMPLATE_ID_PATTERN = re.compile(r"^[a-z0-9_]{1,64}$")
+TEMPLATE_NAME_COMMENT = re.compile(
+    r"<!--\s*template-name:\s*(?P<name>.+?)\s*-->",
+    re.IGNORECASE,
+)
+
+
+def _template_path(template_id: str) -> Path:
+    """Resolve a template id to a file inside the templates directory."""
+    if not TEMPLATE_ID_PATTERN.fullmatch(template_id):
+        raise HTTPException(status_code=404, detail="Landing page template not found")
+
+    path = (TEMPLATES_DIR / f"{template_id}.html").resolve()
+    if path.parent != TEMPLATES_DIR.resolve() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Landing page template not found")
+    return path
+
+
+def _template_display_name(template_id: str, content: str) -> str:
+    """Prefer an explicit template-name comment, else derive from the id."""
+    match = TEMPLATE_NAME_COMMENT.search(content[:512])
+    if match:
+        return match.group("name")
+    return template_id.replace("_", " ").title()
+
 
 # Schemas
 class LandingPageCreate(BaseModel):
@@ -28,6 +56,7 @@ class LandingPageCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
     content: str = Field(default="", max_length=5 * 1024 * 1024)
+    template: str | None = Field(default=None, pattern=r"^[a-z0-9_]{1,64}$")
 
 
 class LandingPageUpdate(BaseModel):
@@ -48,6 +77,24 @@ async def get_landing_pages(
     return {
         "landing_pages": [page.to_dict() for page in pages]
     }
+
+
+# List available landing page templates
+@router.get("/templates")
+async def get_landing_page_templates(
+    current_user: User = Depends(get_current_user_from_session)
+):
+    templates = []
+    for path in sorted(TEMPLATES_DIR.glob("*.html")):
+        template_id = path.stem
+        if not TEMPLATE_ID_PATTERN.fullmatch(template_id):
+            continue
+        content = path.read_text(encoding="utf-8")
+        templates.append({
+            "id": template_id,
+            "name": _template_display_name(template_id, content),
+        })
+    return {"templates": templates}
 
 
 # Get single landing page
@@ -71,10 +118,14 @@ async def create_landing_page(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_operator)
 ):
+    content = data.content
+    if data.template:
+        content = _template_path(data.template).read_text(encoding="utf-8")
+
     page = LandingPage(
         name=data.name,
         description=data.description,
-        content=data.content,
+        content=content,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc)
     )

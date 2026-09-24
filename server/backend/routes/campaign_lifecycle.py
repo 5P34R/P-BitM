@@ -169,7 +169,8 @@ async def create_campaign(
 
     processed_html = process_landing_page(
         html_content=landing_page.content,
-        campaign_id=campaign_id
+        campaign_id=campaign_id,
+        target_url=url,
     )
 
     # Generate config

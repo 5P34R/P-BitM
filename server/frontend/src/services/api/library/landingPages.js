@@ -19,10 +19,18 @@ export function createLandingPagesClient(apiClient) {
     },
 
     async createLandingPage(data) {
+      const payload = landingPagePayload(data)
+      if (data.template) {
+        payload.template = data.template
+      }
       return await apiClient.request(LANDING_PAGE_API, {
         method: 'POST',
-        body: JSON.stringify(landingPagePayload(data))
+        body: JSON.stringify(payload)
       })
+    },
+
+    async getLandingPageTemplates() {
+      return await apiClient.request(`${LANDING_PAGE_API}/templates`, { method: 'GET' })
     },
 
     async updateLandingPage(id, data) {

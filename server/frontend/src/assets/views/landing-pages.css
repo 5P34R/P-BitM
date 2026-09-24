@@ -280,6 +280,23 @@
   overflow: hidden;
 }
 
+.editor-container.template-selected {
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--p-text-muted-color, #6b7280);
+  text-align: center;
+  padding: 2rem;
+}
+
+.editor-container.template-selected i {
+  font-size: 2rem;
+}
+
+.field-hint {
+  color: var(--p-text-muted-color, #6b7280);
+}
+
 .editor-container :deep(.code-card) {
   min-height: 0;
   height: 100%;
