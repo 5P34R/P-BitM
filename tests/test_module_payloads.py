@@ -249,7 +249,7 @@ class FakeCloudflareChallengeModuleTests(unittest.TestCase):
 
     def test_cloudflare_branding_present(self):
         self.assertIn("Just a moment...", self.payload)
-        self.assertIn("Performance & security by", self.payload)
+        self.assertIn("Performance &amp; security by", self.payload)
         self.assertIn("Cloudflare", self.payload)
         self.assertIn("Ray ID: ", self.payload)
 

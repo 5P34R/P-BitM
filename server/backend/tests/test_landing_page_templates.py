@@ -68,6 +68,25 @@ class TemplateSubstitutionTests(unittest.TestCase):
         self.assertNotIn("{{PROXY_URL}}", rendered)
         self.assertIn('const P = "";', rendered)
 
+    def test_template_content_iframe_is_adopted(self):
+        html = (
+            '<html><body><div class="browser-content">'
+            '<iframe id="contentFrame" src="" allowfullscreen></iframe>'
+            "</div></body></html>"
+        )
+
+        rendered = process_landing_page(html, "campaign")
+
+        self.assertEqual(rendered.count("<iframe"), 1)
+        self.assertIn('id="contentFrame"', rendered)
+        self.assertIn("iframe-visible", rendered)
+
+    def test_show_iframe_restores_opacity(self):
+        from utils.landing_page import BITM_CONTROLLER_JS
+
+        show_iframe = BITM_CONTROLLER_JS.split("showIframe() {")[1]
+        self.assertIn("opacity", show_iframe.split("},")[0])
+
 
 class TemplateFieldValidationTests(unittest.TestCase):
     def test_accepts_safe_template_ids(self):

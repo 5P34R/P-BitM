@@ -122,6 +122,7 @@ BITM_CONTROLLER_JS = """
     showIframe() {
       if (!this.elements.iframe) return;
       this.elements.iframe.style.visibility = 'visible';
+      this.elements.iframe.style.opacity = '1';
     },
 
     hideIframe() {
@@ -237,6 +238,21 @@ def process_landing_page(
         # === 1. INJECT IFRAME ===
         # Check if iframe already exists (avoid duplicates)
         existing_iframe = soup.find('iframe', class_='iframe-visible')
+
+        if not existing_iframe:
+            # Adopt a template-provided content iframe (e.g. the BitB
+            # window's #contentFrame) so the stream lands inside the
+            # template's own frame instead of a second, hidden one.
+            candidate = soup.find('iframe', id='contentFrame')
+            if candidate:
+                classes = candidate.get('class') or []
+                if 'iframe-visible' not in classes:
+                    classes.append('iframe-visible')
+                candidate['class'] = classes
+                existing_iframe = candidate
+                logger.info(
+                    f"Campaign {campaign_id}: Adopted template content iframe"
+                )
 
         if not existing_iframe:
             iframe = soup.new_tag('iframe', attrs={
