@@ -59,6 +59,15 @@ class TemplateSubstitutionTests(unittest.TestCase):
                 proxy_url="/stream/",
             )
 
+    def test_legacy_proxy_url_placeholder_is_neutralized(self):
+        rendered = process_landing_page(
+            "<html><body><script>const P = {{PROXY_URL}};</script></body></html>",
+            "campaign",
+        )
+
+        self.assertNotIn("{{PROXY_URL}}", rendered)
+        self.assertIn('const P = "";', rendered)
+
 
 class TemplateFieldValidationTests(unittest.TestCase):
     def test_accepts_safe_template_ids(self):

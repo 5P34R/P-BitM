@@ -165,6 +165,10 @@ def process_landing_page(
         # Use json.dumps to properly escape for JavaScript string context
         if target_url:
             html_content = html_content.replace("{{TARGET_URL}}", json.dumps(target_url))
+        # Legacy pages built from the old BitB template still carry
+        # {{PROXY_URL}}; the stream URL is assigned per session by the
+        # controller, so an empty placeholder keeps those pages working.
+        html_content = html_content.replace("{{PROXY_URL}}", '""')
 
         soup = BeautifulSoup(html_content, 'html.parser')
         head = soup.find('head')
